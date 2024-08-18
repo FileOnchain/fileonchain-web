@@ -3,65 +3,73 @@
 "use client";
 
 import { ApiPromise, WsProvider } from "@polkadot/api";
-import {
-  web3Accounts,
-  web3Enable,
-  web3FromSource,
-} from "@polkadot/extension-dapp";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { networks } from "../constants/networks";
-import { Account, Network } from "../types/types";
+import { useFileStore } from "../store/fileStore";
 
 const useWallet = () => {
-  const [accounts, setAccounts] = useState<Account[]>([]);
-  const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
-  const [selectedNetwork, setSelectedNetwork] = useState<Network>(networks[0]);
-  const [api, setApi] = useState<ApiPromise | null>(null);
+  const { account, network, api, setAccount, setNetwork, setApi } =
+    useFileStore();
 
   useEffect(() => {
     if (typeof window !== "undefined") {
       const init = async () => {
+        const { web3Enable, web3Accounts } = await import(
+          "@polkadot/extension-dapp"
+        );
         const extensions = await web3Enable("FileOnChain");
         if (extensions.length === 0) {
           return;
         }
 
         const allAccounts = await web3Accounts();
-        setAccounts(allAccounts as Account[]);
+        if (allAccounts.length > 0) {
+          const account = allAccounts[0];
+          if (account.meta.genesisHash === undefined) {
+            account.meta.genesisHash = "";
+          }
+          setAccount({
+            ...account,
+            meta: {
+              ...account.meta,
+              genesisHash: account.meta.genesisHash || "",
+              name: account.meta.name || "defaultName",
+            },
+            type: account.type || "defaultType",
+          });
+        }
       };
 
       init();
     }
-  }, []);
+  }, [setAccount]);
 
   useEffect(() => {
     const connectApi = async () => {
-      if (selectedNetwork) {
-        const provider = new WsProvider(selectedNetwork.rpcUrl);
+      if (network) {
+        const provider = new WsProvider(network.rpcUrl);
         const api = await ApiPromise.create({ provider });
         setApi(api);
       }
     };
 
     connectApi();
-  }, [selectedNetwork]);
+  }, [network, setApi]);
 
-  const connectWallet = async (account: Account) => {
+  const connectWallet = async () => {
     if (account && api && typeof window !== "undefined") {
+      const { web3FromSource } = await import("@polkadot/extension-dapp");
       const injector = await web3FromSource(account.meta.source);
       api.setSigner(injector.signer);
-      setSelectedAccount(account);
     }
   };
 
   return {
-    accounts,
-    selectedAccount,
-    selectedNetwork,
-    api,
-    setSelectedNetwork,
-    setSelectedAccount,
     connectWallet,
+    setNetwork: (network: any) => {
+      setNetwork(network);
+      setApi(null); // Reset API when network changes
+    },
   };
 };
 

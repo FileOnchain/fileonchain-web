@@ -1,11 +1,19 @@
-// file: web/src/components/FileUploader.tsx
-
 "use client";
 
 import Image from "next/image";
 import { useMemo } from "react";
+import {
+  FaChevronDown,
+  FaChevronUp,
+  FaEye,
+  FaSpinner,
+  FaUpload,
+  FaWallet,
+} from "react-icons/fa";
+import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
+import { dark } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { useFileUploader } from "../hooks/useFileUploader";
-import useWallet from "../hooks/useWallet";
+import { useFileStore } from "../store/fileStore";
 import { truncateFileName } from "../utils/truncateFileName";
 import ConnectWalletModal from "./ConnectWalletModal";
 
@@ -24,17 +32,15 @@ const FileUploader = () => {
     fileFound,
     explorer,
     error,
-    handleFileChange,
-    handleDrag,
-    handleDrop,
-    handleUpload,
-    handleConnect,
-    handleCidClick,
+    account,
+    network,
     setIsOpen,
     setIsWalletModalOpen,
-  } = useFileUploader();
+    setSelectedCidData,
+  } = useFileStore();
 
-  const { selectedAccount } = useWallet();
+  const { handleFileChange, handleDrag, handleDrop, handleUpload } =
+    useFileUploader();
 
   const renderFileSnippet = () => {
     if (fileContent) {
@@ -82,126 +88,160 @@ const FileUploader = () => {
 
   const uploadSection = useMemo(() => {
     return (
-      <>
+      <div className="space-y-4">
         {txHash && (
-          <p className="bg-green-500 text-white p-2 rounded mb-4 cursor-pointer">
-            <a href={`${explorer}/extrinsic/${txHash}`} target="_blank">
-              Transaction hash: {txHash}
-            </a>
-          </p>
+          <a
+            href={`${explorer}/extrinsic/${txHash}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block bg-button-connect text-white p-2 rounded mb-4 cursor-pointer w-full text-center hover:bg-button-connectHover"
+          >
+            <FaEye className="mr-2" /> View Transaction
+          </a>
         )}
-        <br />
         {isUploading ? (
-          <p>Uploading to blockchain...</p>
+          <div className="flex items-center justify-center w-full">
+            <FaSpinner className="mr-2 animate-spin" />
+            Uploading to blockchain...
+          </div>
         ) : (
           <button
             onClick={handleUpload}
-            className="bg-blue-500 text-white py-2 px-4 rounded hover:bg-blue-700 mb-4"
+            className="bg-button-connect text-white py-2 px-4 rounded hover:bg-button-connectHover mb-4 w-full"
           >
             Upload to Blockchain
           </button>
         )}
-      </>
+      </div>
     );
   }, [txHash, explorer, isUploading, handleUpload]);
 
+  const handleCidClick = (cid: any, data: any, nextCid: any) => {
+    setSelectedCidData({
+      cid: cid.toString(),
+      data: JSON.stringify(new TextDecoder().decode(data)),
+      nextCid: nextCid ? nextCid.toString() : undefined,
+    });
+  };
+
   return (
     <div
-      className={`flex flex-col items-center gap-4 border-2 border-dashed p-12 rounded-md ${
-        dragActive ? "border-blue-500" : "border-gray-600"
+      className={`max-w-6xl mx-auto bg-gray-800 rounded-lg shadow-lg p-8 ${
+        dragActive ? "border-2 border-blue-500" : ""
       }`}
       onDragEnter={handleDrag}
       onDragOver={handleDrag}
       onDragLeave={handleDrag}
       onDrop={handleDrop}
     >
-      <input
-        type="file"
-        onChange={handleFileChange}
-        className="hidden"
-        id="file-upload"
-      />
-      <label
-        htmlFor="file-upload"
-        className="flex flex-col items-center gap-2 cursor-pointer"
-      >
-        <span className="text-gray-400 bg-gray-700 border border-gray-600 rounded p-2">
-          Choose File
-        </span>
-        <p className="text-gray-500">or drag and drop here</p>
-      </label>
+      <h2 className="text-2xl font-bold text-white mb-6">File Uploader</h2>
+      {network && (
+        <p className="text-gray-400 mb-4">Connected to: {network.name}</p>
+      )}
+      <div className="mb-8">
+        <input
+          type="file"
+          onChange={handleFileChange}
+          className="hidden"
+          id="file-upload"
+        />
+        <label
+          htmlFor="file-upload"
+          className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-600 rounded-lg cursor-pointer hover:border-blue-500 transition-colors duration-300"
+        >
+          <FaUpload className="text-gray-400 text-3xl mb-2" />
+          <span className="text-gray-400">Choose a file or drag it here</span>
+        </label>
+      </div>
+
       {file && (
-        <div className="text-center mt-4">
-          <p className="mb-2">
-            Selected file: {truncateFileName(file.name, 40)}
-          </p>
-          <p className="mb-2">Chunk size: {chunkSize / 1024} KB</p>
-          {renderFileSnippet()}
-          {(fileFound || txHash) && (
-            <>
+        <>
+          <div className="bg-gray-700 rounded-lg p-6 mb-8">
+            <h3 className="text-xl font-semibold text-white mb-4">
+              File Details
+            </h3>
+            <p className="text-gray-300 mb-2">
+              Selected file: {truncateFileName(file.name, 40)}
+            </p>
+            <p className="text-gray-300 mb-4">
+              Chunk size: {chunkSize / 1024} KB
+            </p>
+            {renderFileSnippet()}
+          </div>
+
+          <div className="flex flex-col space-y-4">
+            {(fileFound || txHash) && (
               <a
                 href={`/api/cid/${cids[0].cid.toString()}`}
                 target="_blank"
-                className="bg-blue-500 text-white p-2 rounded mb-4 inline-block"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center bg-button-secondary text-white py-2 px-4 rounded-lg hover:bg-button-secondaryHover transition-colors duration-300 w-full"
               >
-                View file
+                <FaEye className="mr-2" /> View File
               </a>
-              <br />
-            </>
-          )}
-          <button
-            onClick={() => setIsWalletModalOpen(true)}
-            className="bg-blue-500 text-white py-2 px-4 rounded hover:bg-blue-700 mb-4"
-          >
-            {selectedAccount ? selectedAccount.address : "Connect Wallet"}
-          </button>
-          {uploadSection}
-          <br />
-          <button
-            onClick={() => setIsOpen(!isOpen)}
-            className="bg-gray-600 text-white py-2 px-4 rounded hover:bg-gray-800 mb-4"
-          >
-            {isOpen ? "Hide" : "Show"} Multi-DAG Structure
-          </button>
-          {error && (
-            <p className="bg-red-500 text-white p-2 rounded mb-4">{error}</p>
-          )}
-          {isOpen && (
-            <div className="mt-4 w-full max-w-2xl bg-gray-800 text-white p-4 rounded mx-auto">
-              <h3 className="text-lg font-semibold mb-2">
-                Multi-DAG Structure
-              </h3>
-              <ul className="list-disc list-inside">
-                {cids.map((item, index) => (
-                  <li
-                    key={index}
-                    className="break-words cursor-pointer hover:underline"
-                    onClick={() =>
-                      handleCidClick(item.cid, item.data, item.nextCid)
-                    }
-                  >
-                    Chunk {index + 1}: {item.cid.toString()}
-                  </li>
-                ))}
-              </ul>
-              {selectedCidData && (
-                <div className="mt-4 bg-gray-700 text-white p-4 rounded break-words">
-                  <h4 className="text-md font-semibold mb-2">CID Data</h4>
-                  <pre
-                    style={{ whiteSpace: "pre-wrap", wordWrap: "break-word" }}
-                  >
-                    {JSON.stringify(selectedCidData, null, 2)}
-                  </pre>
-                </div>
+            )}
+
+            <button
+              onClick={() => setIsWalletModalOpen(true)}
+              className="flex items-center justify-center bg-button-connect text-white py-2 px-4 rounded-lg hover:bg-button-connectHover transition-colors duration-300 w-full"
+            >
+              <FaWallet className="mr-2" />
+              {account
+                ? truncateFileName(account.address, 20)
+                : "Connect Wallet"}
+            </button>
+
+            {uploadSection}
+
+            <button
+              onClick={() => setIsOpen(!isOpen)}
+              className="flex items-center justify-center bg-gray-600 text-white py-2 px-4 rounded-lg hover:bg-gray-700 transition-colors duration-300 w-full"
+            >
+              {isOpen ? (
+                <FaChevronUp className="mr-2" />
+              ) : (
+                <FaChevronDown className="mr-2" />
               )}
+              {isOpen ? "Hide" : "Show"} Multi-DAG Structure
+            </button>
+          </div>
+        </>
+      )}
+
+      {error && (
+        <p className="bg-red-500 text-white p-4 rounded-lg mt-4">{error}</p>
+      )}
+
+      {isOpen && file && (
+        <div className="mt-8 bg-gray-700 text-white p-6 rounded-lg">
+          <h3 className="text-xl font-semibold mb-4">Multi-DAG Structure</h3>
+          <ul className="space-y-2">
+            {cids.map((item, index) => (
+              <li
+                key={index}
+                className="cursor-pointer hover:bg-gray-600 p-2 rounded transition-colors duration-300"
+                onClick={() =>
+                  handleCidClick(item.cid, item.data, item.nextCid)
+                }
+              >
+                Chunk {index + 1}: {truncateFileName(item.cid.toString(), 30)}
+              </li>
+            ))}
+          </ul>
+          {selectedCidData && (
+            <div className="mt-6 bg-gray-800 p-4 rounded-lg">
+              <h4 className="text-lg font-semibold mb-2">CID Data</h4>
+              <SyntaxHighlighter language="json" style={dark} wrapLongLines>
+                {JSON.stringify(selectedCidData, null, 2)}
+              </SyntaxHighlighter>
             </div>
           )}
         </div>
       )}
+
       <ConnectWalletModal
         isOpen={isWalletModalOpen}
         onClose={() => setIsWalletModalOpen(false)}
-        onConnect={handleConnect}
       />
     </div>
   );
