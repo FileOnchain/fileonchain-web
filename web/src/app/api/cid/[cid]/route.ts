@@ -126,7 +126,7 @@ export const GET = async (
             }
           });
         }
-        if (blockNumber + 5 < blockToCheck) break;
+        if (blockNumber + 15 < blockToCheck) break;
         else blockToCheck++;
       }
 
@@ -196,7 +196,10 @@ export const GET = async (
 
     const rawData = await getMultipleRawData(document);
 
-    if (rawData) {
+    // Log the length of rawData for debugging
+    console.log("Length of rawData:", rawData ? rawData.length : 0);
+
+    if (rawData && rawData.length > 0) {
       const contentType =
         rawData[0] === 0x89 && rawData[1] === 0x50
           ? "image/png"
@@ -204,7 +207,16 @@ export const GET = async (
 
       if (contentType === "application/json") {
         const rebuiltFile = rawData.toString("utf-8");
-        return NextResponse.json(JSON.parse(rebuiltFile));
+        // Check if rebuiltFile is valid JSON before parsing
+        try {
+          return NextResponse.json(JSON.parse(rebuiltFile));
+        } catch (jsonError) {
+          console.error("Error parsing JSON:", jsonError);
+          return NextResponse.json(
+            { success: false, message: "Invalid JSON data" },
+            { status: 400 }
+          );
+        }
       } else {
         return new NextResponse(rawData, {
           status: 200,
@@ -214,6 +226,7 @@ export const GET = async (
         });
       }
     } else {
+      console.error("No valid file data found");
       return NextResponse.json(
         { success: false, message: "No valid file data found" },
         { status: 404 }
